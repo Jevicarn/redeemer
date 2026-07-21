@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jevicarn School System | {{ workspace }}</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#14335f">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-body" data-role="{{ role }}">
+  <div class="page-wrap">
+    <aside class="sidebar glass">
+      <div>
+        <div class="brand-line">
+          <span class="brand-dot"></span>
+          <div>
+            <div class="brand-name">Jevicarn School</div>
+            <div class="brand-subtitle">{{ workspace }}</div>
+          </div>
+        </div>
+
+        <nav class="side-nav">
+          <a href="#overview" class="nav-link active">Overview</a>
+          <a href="#students" class="nav-link">Students</a>
+          <a href="#payments" class="nav-link">Payments</a>
+          <a href="#analytics" class="nav-link">Analytics</a>
+          {% if role == "Admin" %}
+          <a href="#users" class="nav-link">Users</a>
+          <a href="#backup" class="nav-link">Backup</a>
+          <a href="#audit" class="nav-link">Audit</a>
+          {% endif %}
+        </nav>
+      </div>
+
+      <div class="user-chip">
+        <div class="user-avatar">{{ current_user.full_name[:1] }}</div>
+        <div class="user-chip-meta">
+          <strong>{{ current_user.full_name }}</strong>
+          <span>{{ current_user.role }} • @{{ current_user.username }}</span>
+          <a href="{{ url_for('profile') }}">Profile</a>
+        </div>
+        <a class="btn btn-ghost mini" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar glass">
+        <div>
+          <div class="eyebrow">Jevicarn School System</div>
+          <h1>{{ workspace }}</h1>
+          <div class="muted" id="liveClock"></div>
+        </div>
+        <div class="top-actions">
+          {% if role == "Admin" %}
+            <a class="btn btn-ghost" href="#users">Add User</a>
+          {% endif %}
+          <button class="btn btn-ghost" id="installBtn" hidden>Install App</button>
+          {% if role != "Admin" %}
+            <a class="btn btn-primary" href="#students">Add Student</a>
+            <a class="btn btn-primary" href="#payments">Record Payment</a>
+          {% else %}
+            <a class="btn btn-primary" href="#backup">Recent Payments</a>
+          {% endif %}
+          <a class="btn btn-ghost" href="{{ url_for('logout') }}">Logout</a>
+        </div>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+
+      <section id="overview" class="grid grid-4">
+        <article class="stat-card glass blue">
+          <span>Total Students</span>
+          <strong>{{ summary.students }}</strong>
+        </article>
+        <article class="stat-card glass cyan">
+          <span>Active Students</span>
+          <strong>{{ summary.active_students }}</strong>
+        </article>
+        <article class="stat-card glass gold">
+          <span>Total Collections</span>
+          <strong>KES {{ "{:,.0f}".format(summary.collections or 0) }}</strong>
+        </article>
+        <article class="stat-card glass slate">
+          <span>{% if role == "Admin" %}Active Users{% else %}Paid / Pending{% endif %}</span>
+          <strong>{% if role == "Admin" %}{{ summary.active_users }}{% else %}{{ summary.paid }} / {{ summary.pending }}{% endif %}</strong>
+        </article>
+      </section>
+
+      <section class="hero-panel glass">
+        <div class="hero-left">
+          <div class="eyebrow">Selected Student Summary</div>
+          <h2 id="selectedStudentName">{{ selected_student.full_name if selected_student else "No student selected" }}</h2>
+          <p class="muted" id="selectedStudentMeta">
+            Admission No: <strong>{{ selected_student.admission_no if selected_student else "-" }}</strong>
+            • Grade: <strong>{{ selected_student.grade if selected_student else "-" }}</strong>
+          </p>
+        </div>
+        <div class="summary-grid">
+          <div class="mini-card">
+            <span>Status</span>
+            <strong id="selectedStatus">{{ selected_student.payment_status if selected_student else "-" }}</strong>
+          </div>
+          <div class="mini-card">
+            <span>Balance</span>
+            <strong id="selectedBalance">KES {{ "{:,.0f}".format(selected_student.balance or 0) if selected_student else "-" }}</strong>
+          </div>
+          <div class="mini-card">
+            <span>Guardian</span>
+            <strong id="selectedGuardian">{{ selected_student.guardian if selected_student else "-" }}</strong>
+          </div>
+          <div class="mini-card">
+            <span>Action</span>
+            <button class="btn btn-primary mini" id="openStudentBtn" {% if not selected_student %}disabled{% endif %}>Open Details</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-grid" id="students">
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Student Management</div>
+              <h3>Add Student</h3>
+            </div>
+          </div>
+          <form class="stack-form" method="post" action="{{ url_for('add_student') }}">
+            <label><span>Admission Number</span><input name="admission_no" required></label>
+            <label><span>Student Name</span><input name="full_name" required></label>
+            <label><span>Class / Grade</span><input name="grade" placeholder="Grade 8" required></label>
+            <label><span>Guardian</span><input name="guardian" placeholder="Parent / Guardian"></label>
+            <button class="btn btn-primary" type="submit">Save Student</button>
+          </form>
+        </div>
+
+        <div class="panel glass table-panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Students Table</div>
+              <h3>Latest records</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th><th>Admission No.</th><th>Grade</th><th>Status</th><th>Balance</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in students %}
+                <tr class="student-row" data-student-id="{{ s.id }}">
+                  <td>{{ s.full_name }}</td>
+                  <td>{{ s.admission_no }}</td>
+                  <td>{{ s.grade }}</td>
+                  <td><span class="pill {{ s.payment_status|lower }}">{{ s.payment_status }}</span></td>
+                  <td>KES {{ "{:,.0f}".format(s.balance or 0) }}</td>
+                  <td>
+                    <button class="btn btn-ghost mini js-view-student" type="button" data-student-id="{{ s.id }}">View</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="payments" class="section-grid">
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Payment Recording</div>
+              <h3>Post receipt</h3>
+            </div>
+          </div>
+          <form class="stack-form" method="post" action="{{ url_for('add_payment') }}">
+            <label><span>Admission Number</span><input name="admission_no" required></label>
+            <label><span>Amount</span><input name="amount" type="number" step="0.01" min="0" required></label>
+            <label>
+              <span>Payment Method</span>
+              <select name="method" required>
+                <option value="">Select method</option>
+                <option>Cash</option>
+                <option>M-Pesa</option>
+                <option>Bank</option>
+                <option>Cheque</option>
+              </select>
+            </label>
+            <label><span>Reference / Receipt Number</span><input name="reference_no" placeholder="Receipt or transaction ID"></label>
+            <button class="btn btn-primary" type="submit">Save Payment</button>
+          </form>
+        </div>
+
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Recent Payments</div>
+              <h3>Latest ledger</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th><th>Admission No.</th><th>Student</th><th>Amount</th><th>Method</th><th>By</th><th>Status</th>{% if role == "Admin" %}<th>Action</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in payments %}
+                <tr>
+                  <td>{{ p.created_at[:16] }}</td>
+                  <td>{{ p.admission_no }}</td>
+                  <td>{{ p.student_name }}</td>
+                  <td>KES {{ "{:,.0f}".format(p.amount or 0) }}</td>
+                  <td>{{ p.method }}</td>
+                  <td>{{ p.recorded_by_name }}</td>
+                  <td><span class="pill {{ p.status|lower }}">{{ p.status }}</span></td>
+                  {% if role == "Admin" %}
+                  <td>
+                    {% if p.status != 'Reversed' %}
+                    <form method="post" action="{{ url_for('reverse_payment', payment_id=p.id) }}" onsubmit="return confirm('Reverse this payment?');">
+                      <button class="btn btn-ghost mini" type="submit">Reverse</button>
+                    </form>
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="analytics" class="section-grid analytics-grid">
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Analytics</div>
+              <h3>Collections split</h3>
+            </div>
+          </div>
+          <div class="donut-card">
+            <div class="donut" style="--p: {{ (summary.paid * 100 // (summary.students or 1)) }}%"></div>
+            <div class="legend">
+              <div><span class="chip primary"></span> Paid: {{ summary.paid }}</div>
+              <div><span class="chip muted"></span> Pending: {{ summary.pending }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Performance</div>
+              <h3>Payments by method</h3>
+            </div>
+          </div>
+          <div class="bar-chart">
+            {% set cash = payments|selectattr('method','equalto','Cash')|list|length %}
+            {% set mpesa = payments|selectattr('method','equalto','M-Pesa')|list|length %}
+            {% set bank = payments|selectattr('method','equalto','Bank')|list|length %}
+            {% set cheque = payments|selectattr('method','equalto','Cheque')|list|length %}
+            <div class="bar" style="--h: {{ cash * 18 + 20 }}%"><span></span><label>Cash</label></div>
+            <div class="bar" style="--h: {{ mpesa * 18 + 20 }}%"><span></span><label>M-Pesa</label></div>
+            <div class="bar" style="--h: {{ bank * 18 + 20 }}%"><span></span><label>Bank</label></div>
+            <div class="bar" style="--h: {{ cheque * 18 + 20 }}%"><span></span><label>Cheque</label></div>
+          </div>
+        </div>
+      </section>
+
+      {% if role == "Admin" %}
+      <section id="users" class="section-grid">
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">User Management</div>
+              <h3>Add / Edit User</h3>
+            </div>
+          </div>
+          <form class="stack-form" method="post" action="{{ url_for('add_user') }}">
+            <label><span>Full Name</span><input name="full_name" required></label>
+            <label><span>Username</span><input name="username" required></label>
+            <label><span>Password</span><input name="password" type="password" required></label>
+            <label>
+              <span>Role</span>
+              <select name="role" required>
+                <option>Staff</option>
+                <option>Admin</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Create User</button>
+          </form>
+        </div>
+
+        <div class="panel glass table-panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Users</div>
+              <h3>Workspace access</h3>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr>
+              </thead>
+              <tbody>
+                {% for u in users %}
+                <tr>
+                  <td>{{ u.full_name }}</td>
+                  <td>{{ u.username }}</td>
+                  <td>{{ u.role }}</td>
+                  <td>{{ u.created_at[:16] }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="backup" class="section-grid">
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Backup Export</div>
+              <h3>Download database</h3>
+            </div>
+          </div>
+          <a class="btn btn-primary btn-block" href="{{ url_for('backup_download') }}">Download Backup</a>
+        </div>
+
+        <div class="panel glass">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">Backup Restore</div>
+              <h3>Upload database</h3>
+            </div>
+          </div>
+          <form class="stack-form" method="post" action="{{ url_for('backup_restore') }}" enctype="multipart/form-data">
+            <label><span>Backup File</span><input type="file" name="backup_file" accept=".db,.sqlite,.sqlite3" required></label>
+            <button class="btn btn-primary" type="submit">Restore Backup</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="audit" class="panel glass">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">Audit Log</div>
+            <h3>Accountability trail</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+              {% for a in audits %}
+              <tr>
+                <td>{{ a.created_at[:16] }}</td>
+                <td>{{ a.actor_name }}</td>
+                <td>{{ a.action }}</td>
+                <td>{{ a.details }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% endif %}
+    </main>
+  </div>
+
+  <dialog class="modal" id="studentModal">
+    <div class="modal-card glass">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Student Details</div>
+          <h3 id="modalStudentName">Loading...</h3>
+        </div>
+        <button class="btn btn-ghost mini" id="closeStudentModal" type="button">Close</button>
+      </div>
+      <div class="summary-grid modal-summary">
+        <div class="mini-card"><span>Admission No.</span><strong id="modalAdmission"></strong></div>
+        <div class="mini-card"><span>Grade</span><strong id="modalGrade"></strong></div>
+        <div class="mini-card"><span>Status</span><strong id="modalStatus"></strong></div>
+        <div class="mini-card"><span>Balance</span><strong id="modalBalance"></strong></div>
+      </div>
+      <div class="table-wrap modal-table">
+        <table>
+          <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>By</th><th>Status</th></tr></thead>
+          <tbody id="modalPaymentsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    window.JEVICARN = {
+      selectedStudentId: {{ selected_student.id if selected_student else 'null' }},
+      csrfHint: "session"
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
