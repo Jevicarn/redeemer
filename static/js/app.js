@@ -1,40 +1,93 @@
 (() => {
-  const role = document.body?.dataset?.role || "";
   const clock = document.getElementById("liveClock");
   const selectedStudentId = window.JEVICARN?.selectedStudentId ?? null;
   const installBtn = document.getElementById("installBtn");
+  const sidebarDrawer = document.getElementById("sidebarDrawer");
+  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarClose = document.getElementById("sidebarClose");
   let deferredPrompt = null;
+
+  const panels = Array.from(document.querySelectorAll(".workspace-panel"));
+  const defaultPanel = document.getElementById("students-panel");
 
   function pad(n) { return String(n).padStart(2, "0"); }
   function renderClock() {
     if (!clock) return;
     const d = new Date();
-    clock.textContent = d.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" }) +
-      " • " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+    const datePart = d.toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    clock.textContent = `${datePart} • ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
   renderClock();
   setInterval(renderClock, 1000);
 
-  // Active nav state
-  const navLinks = [...document.querySelectorAll(".nav-link")];
-  const sections = navLinks
-    .map(a => document.querySelector(a.getAttribute("href")))
-    .filter(Boolean);
+  function openSidebar() {
+    if (!sidebarDrawer || !sidebarBackdrop) return;
+    sidebarDrawer.classList.add("open");
+    sidebarBackdrop.hidden = false;
+    requestAnimationFrame(() => sidebarBackdrop.classList.add("show"));
+  }
 
-  const setActiveNav = () => {
-    let active = null;
-    const scrollY = window.scrollY + 120;
-    for (const section of sections) {
-      if (section.offsetTop <= scrollY) active = section.id;
+  function closeSidebar() {
+    if (!sidebarDrawer || !sidebarBackdrop) return;
+    sidebarDrawer.classList.remove("open");
+    sidebarBackdrop.classList.remove("show");
+    window.setTimeout(() => {
+      if (!sidebarDrawer.classList.contains("open")) sidebarBackdrop.hidden = true;
+    }, 180);
+  }
+
+  function showPanel(panelId, scrollTarget) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    panels.forEach((p) => p.classList.add("hidden"));
+    panel.classList.remove("hidden");
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (scrollTarget) {
+      window.setTimeout(() => {
+        const target = document.getElementById(scrollTarget);
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
     }
-    navLinks.forEach(a => {
-      a.classList.toggle("active", a.getAttribute("href") === "#" + (active || "overview"));
-    });
-  };
-  window.addEventListener("scroll", setActiveNav, { passive: true });
-  setActiveNav();
+  }
 
-  // PWA install prompt
+  function activateFromButton(button) {
+    const panelId = button.dataset.target;
+    const scrollTarget = button.dataset.scroll;
+    if (panelId) showPanel(panelId, scrollTarget);
+    if (window.matchMedia("(max-width: 900px)").matches) closeSidebar();
+  }
+
+  sidebarToggle?.addEventListener("click", openSidebar);
+  sidebarClose?.addEventListener("click", closeSidebar);
+  sidebarBackdrop?.addEventListener("click", closeSidebar);
+
+  document.querySelectorAll(".nav-group-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const group = button.closest(".nav-group");
+      if (!group) return;
+      const willOpen = !group.classList.contains("open");
+      group.classList.toggle("open", willOpen);
+      button.setAttribute("aria-expanded", String(willOpen));
+      activateFromButton(button);
+    });
+  });
+
+  document.querySelectorAll(".nav-action").forEach((button) => {
+    button.addEventListener("click", () => activateFromButton(button));
+  });
+
+  document.querySelectorAll(".side-nav a").forEach((link) => {
+    link.addEventListener("click", () => {
+      if (window.matchMedia("(max-width: 900px)").matches) closeSidebar();
+    });
+  });
+
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPrompt = e;
@@ -48,7 +101,6 @@
     installBtn.hidden = true;
   });
 
-  // Service worker
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", async () => {
       try {
@@ -59,7 +111,6 @@
     });
   }
 
-  // Student modal
   const modal = document.getElementById("studentModal");
   const closeBtn = document.getElementById("closeStudentModal");
   const openBtn = document.getElementById("openStudentBtn");
@@ -125,7 +176,6 @@
     if (!inDialog) modal.close();
   });
 
-  // Make table rows selectable
   document.querySelectorAll(".student-row").forEach(row => {
     row.addEventListener("click", (e) => {
       if (e.target.closest("button, form, a")) return;
@@ -133,7 +183,6 @@
     });
   });
 
-  // Keep forms resilient
   document.querySelectorAll("form").forEach(form => {
     form.addEventListener("submit", () => {
       const btn = form.querySelector("button[type='submit']");
@@ -143,4 +192,6 @@
       }
     });
   });
+
+  if (defaultPanel) panels.forEach((p) => p !== defaultPanel && p.classList.add("hidden"));
 })();
