@@ -295,47 +295,84 @@ def hidden_admin_entry():
 def dashboard():
     user = current_user()
     role = user["role"]
+    selected_grade = request.args.get("grade", "").strip() or None
+    grade_params = (selected_grade,) if selected_grade else ()
+    student_where = "WHERE grade = ?" if selected_grade else ""
+    payment_where = "WHERE s.grade = ?" if selected_grade else ""
+
     students = q(
-        "SELECT * FROM students ORDER BY created_at DESC, id DESC LIMIT 20"
+        f"SELECT * FROM students {student_where} ORDER BY created_at DESC, id DESC LIMIT 20",
+        grade_params,
     )
     payments = q(
-        """
+        f"""
         SELECT p.*, s.full_name AS student_name, s.admission_no, u.full_name AS recorded_by_name
         FROM payments p
         JOIN students s ON s.id = p.student_id
         JOIN users u ON u.id = p.recorded_by
+        {payment_where}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT 20
-        """
+        """,
+        grade_params,
     )
     audits = q("SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 20")
     users = q("SELECT id, full_name, username, role, created_at FROM users ORDER BY created_at DESC")
+    available_grades = [row["grade"] for row in q("SELECT DISTINCT grade FROM students ORDER BY grade")]
+
+    summary_students = q(
+        f"SELECT COUNT(*) AS c FROM students {student_where}",
+        grade_params,
+        one=True,
+    )["c"]
+    summary_active = q(
+        "SELECT COUNT(*) AS c FROM students WHERE grade = ? AND active = 1" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE active = 1",
+        grade_params if selected_grade else (),
+        one=True,
+    )["c"]
+    summary_paid = q(
+        "SELECT COUNT(*) AS c FROM students WHERE grade = ? AND payment_status = 'Paid'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Paid'",
+        grade_params if selected_grade else (),
+        one=True,
+    )["c"]
+    summary_pending = q(
+        "SELECT COUNT(*) AS c FROM students WHERE grade = ? AND payment_status = 'Pending'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Pending'",
+        grade_params if selected_grade else (),
+        one=True,
+    )["c"]
+    summary_collections = q(
+        "SELECT COALESCE(SUM(amount), 0) AS total FROM payments p JOIN students s ON s.id = p.student_id WHERE p.status = 'Posted' AND s.grade = ?" if selected_grade else "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'Posted'",
+        grade_params if selected_grade else (),
+        one=True,
+    )["total"]
+
     summary = {
-        "students": q("SELECT COUNT(*) AS c FROM students", one=True)["c"],
-        "active_students": q("SELECT COUNT(*) AS c FROM students WHERE active = 1", one=True)["c"],
-        "collections": q(
-            "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'Posted'",
-            one=True,
-        )["total"],
+        "students": summary_students,
+        "active_students": summary_active,
+        "collections": summary_collections,
         "active_users": q("SELECT COUNT(*) AS c FROM users", one=True)["c"] if role == "Admin" else None,
-        "paid": q("SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Paid'", one=True)["c"],
-        "pending": q("SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Pending'", one=True)["c"],
+        "paid": summary_paid,
+        "pending": summary_pending,
     }
+
     selected_student_id = request.args.get("student_id", type=int)
     selected_student = None
     student_payments = []
     if selected_student_id:
         selected_student = q("SELECT * FROM students WHERE id = ?", (selected_student_id,), one=True)
-        student_payments = q(
-            """
-            SELECT p.*, u.full_name AS recorded_by_name
-            FROM payments p
-            JOIN users u ON u.id = p.recorded_by
-            WHERE p.student_id = ?
-            ORDER BY p.created_at DESC, p.id DESC
-            """,
-            (selected_student_id,),
-        )
+        if selected_grade and selected_student and selected_student["grade"] != selected_grade:
+            selected_student = None
+        if selected_student:
+            student_payments = q(
+                """
+                SELECT p.*, u.full_name AS recorded_by_name
+                FROM payments p
+                JOIN users u ON u.id = p.recorded_by
+                WHERE p.student_id = ?
+                ORDER BY p.created_at DESC, p.id DESC
+                """,
+                (selected_student_id,),
+            )
     if not selected_student and students:
         selected_student = students[0]
         student_payments = q(
@@ -360,6 +397,8 @@ def dashboard():
         users=users,
         selected_student=selected_student,
         selected_student_payments=student_payments,
+        selected_grade=selected_grade,
+        available_grades=available_grades,
     )
 
 

@@ -82,6 +82,10 @@
     button.addEventListener("click", () => activateFromButton(button));
   });
 
+  document.querySelectorAll(".nav-group-toggle").forEach((button) => {
+    button.style.cursor = "pointer";
+  });
+
   document.querySelectorAll(".side-nav a").forEach((link) => {
     link.addEventListener("click", () => {
       if (window.matchMedia("(max-width: 900px)").matches) closeSidebar();

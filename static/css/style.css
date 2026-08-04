@@ -579,3 +579,117 @@ tbody tr:hover{background:rgba(31,95,191,.05)}
   }
 }
 
+
+
+/* --- Sidebar and section styling refresh --- */
+.sidebar,
+.sidebar-drawer,
+.nav-group,
+.nav-group-toggle,
+.nav-group-links,
+.nav-link,
+.sidebar-head,
+.sidebar-foot,
+.sidebar-title {
+  border-radius: 0 !important;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #1d1d1d 0%, #2b1f14 100%);
+  border: 1px solid rgba(255, 182, 88, 0.15);
+  color: #fff6ec;
+}
+
+.sidebar .brand-name,
+.sidebar .brand-subtitle,
+.sidebar .eyebrow,
+.sidebar .nav-group-toggle,
+.sidebar .nav-link,
+.sidebar .sidebar-title h2,
+.sidebar .muted {
+  color: inherit;
+}
+
+.sidebar .brand-subtitle,
+.sidebar .muted {
+  color: rgba(255, 246, 236, 0.72) !important;
+}
+
+.side-nav-groups {
+  gap: 10px;
+}
+
+.nav-group {
+  border: 1px solid rgba(255, 182, 88, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.nav-group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 173, 89, 0.14);
+  color: #fff8ef;
+  border: 0;
+  padding: 14px 14px;
+  font-weight: 800;
+}
+
+.nav-group-links {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(248, 168, 74, 0.08);
+  border-top: 1px solid rgba(255, 182, 88, 0.12);
+}
+
+.nav-link {
+  display: block;
+  text-align: left;
+  border: 1px solid rgba(255, 182, 88, 0.16);
+  background: rgba(255, 248, 240, 0.05);
+  color: #fff8ef;
+  padding: 11px 12px;
+  font-weight: 700;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  background: rgba(255, 181, 90, 0.22);
+  border-color: rgba(255, 197, 117, 0.30);
+  transform: none;
+}
+
+.nav-grade-links .nav-link {
+  background: rgba(255, 191, 106, 0.10);
+}
+
+.sidebar .btn {
+  border-radius: 0 !important;
+}
+
+.sidebar-foot .btn,
+.sidebar-close,
+.sidebar-toggle {
+  border-radius: 0 !important;
+}
+
+.sidebar-toggle {
+  border: 1px solid rgba(255, 173, 89, 0.35);
+  background: rgba(255, 173, 89, 0.20);
+  color: #4d2b08;
+}
+
+.nav-group, .nav-group-links {
+  box-shadow: none;
+}
+
+.workspace-panel .mini-card,
+.workspace-panel .table-wrap,
+.workspace-panel table,
+.workspace-panel .panel-head {
+  border-radius: 0 !important;
+}
+

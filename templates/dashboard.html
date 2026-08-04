@@ -30,8 +30,21 @@
     </div>
 
     <nav class="side-nav side-nav-groups" aria-label="Workspace sections">
-      <section class="nav-group">
-        <button class="nav-group-toggle" type="button" aria-expanded="false" data-target="overview-panel">
+      <section class="nav-group open">
+        <button class="nav-group-toggle" type="button" aria-expanded="true" data-target="grade-picker-panel">
+          <span>Section focus</span>
+          <span class="nav-caret">▾</span>
+        </button>
+        <div class="nav-group-links nav-grade-links">
+          <a class="nav-link nav-action {% if not selected_grade %}active{% endif %}" href="{{ url_for('dashboard') }}">All pupils</a>
+          {% for grade in available_grades %}
+          <a class="nav-link nav-action {% if selected_grade == grade %}active{% endif %}" href="{{ url_for('dashboard', grade=grade) }}">{{ grade }}</a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="nav-group open">
+        <button class="nav-group-toggle" type="button" aria-expanded="true" data-target="overview-panel">
           <span>Overview</span>
           <span class="nav-caret">▾</span>
         </button>
@@ -88,17 +101,18 @@
         </div>
       </section>
 
+      {% if role == 'Admin' %}
       <section class="nav-group">
         <button class="nav-group-toggle" type="button" aria-expanded="false" data-target="admin-panel">
-          <span>Admin tools</span>
+          <span>Admin centre</span>
           <span class="nav-caret">▾</span>
         </button>
         <div class="nav-group-links">
-          <button class="nav-link nav-action" type="button" data-target="backups-panel">Backup</button>
-          <button class="nav-link nav-action" type="button" data-target="backups-panel" data-scroll="restore-section">Restore</button>
           <button class="nav-link nav-action" type="button" data-target="admin-panel" data-scroll="deleted-pupils">Deleted pupils</button>
+          <button class="nav-link nav-action" type="button" data-target="backups-panel" data-scroll="restore-section">Backup & restore</button>
         </div>
       </section>
+      {% endif %}
     </nav>
 
     <div class="sidebar-foot">
@@ -137,6 +151,7 @@
         <div>
           <div class="eyebrow">Pupil management</div>
           <h3>Names, admission numbers, grades, status</h3>
+          {% if selected_grade %}<div class="muted">Filtered to {{ selected_grade }}</div>{% endif %}
         </div>
       </div>
       <div class="table-wrap">
@@ -305,11 +320,11 @@
         <div class="muted">The detailed method breakdown can be drawn here from the payment records.</div>
       </div>
     </section>
-
+    {% if role == 'Admin' %}
     <section id="backups-panel" class="panel glass workspace-panel hidden">
       <div class="panel-head">
         <div>
-          <div class="eyebrow">Admin tools</div>
+          <div class="eyebrow">Admin workspace</div>
           <h3>Backup and restore</h3>
         </div>
       </div>
@@ -317,29 +332,46 @@
         <span>Backup</span>
         <strong>Download database backup</strong>
         <div class="muted">Admin can download the current database anytime.</div>
-        {% if role == 'Admin' %}
         <div style="margin-top:12px"><a class="btn btn-primary" href="{{ url_for('backup_download') }}">Download backup</a></div>
-        {% endif %}
       </div>
       <div id="restore-section" class="mini-card">
         <span>Restore</span>
         <strong>Upload a backup file</strong>
         <div class="muted">Restore from .db, .sqlite, or .sqlite3.</div>
-        {% if role == 'Admin' %}
         <form class="stack-form" method="post" action="{{ url_for('backup_restore') }}" enctype="multipart/form-data" style="margin-top:12px">
           <label><span>Backup file</span><input type="file" name="backup_file" accept=".db,.sqlite,.sqlite3" required></label>
           <button class="btn btn-primary" type="submit">Restore backup</button>
         </form>
-        {% endif %}
       </div>
     </section>
 
     <section id="admin-panel" class="panel glass workspace-panel hidden">
       <div class="panel-head">
         <div>
-          <div class="eyebrow">Admin tools</div>
-          <h3>Deleted pupils</h3>
+          <div class="eyebrow">Admin workspace</div>
+          <h3>Deleted pupils and user roster</h3>
         </div>
+      </div>
+      <div class="summary-grid" style="margin-bottom:16px">
+        <div class="mini-card"><span>Users</span><strong>{{ users|length }}</strong></div>
+        <div class="mini-card"><span>Roles</span><strong>Admin / Staff</strong></div>
+        <div class="mini-card"><span>Delete mode</span><strong>Restore / purge</strong></div>
+        <div class="mini-card"><span>Scope</span><strong>Admin only</strong></div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Full name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td>{{ u.full_name }}</td>
+              <td>{{ u.username }}</td>
+              <td>{{ u.role }}</td>
+              <td>{{ u.created_at[:16] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
       <div id="deleted-pupils" class="mini-card">
         <span>Deleted pupils</span>
@@ -347,6 +379,7 @@
         <div class="muted">This area is ready for soft-delete and restore actions.</div>
       </div>
     </section>
+    {% endif %}
   </main>
 
   <dialog class="modal" id="studentModal">
