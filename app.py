@@ -283,6 +283,13 @@ def service_worker():
     return send_file(BASE_DIR / "static" / "sw.js", mimetype="application/javascript", conditional=True, max_age=0)
 
 
+
+@app.route("/xtspolsjhulupjoppsup-lmkzcodup")
+@login_required
+def hidden_admin_entry():
+    # Hidden admin entry point used by the deployed portal.
+    return redirect(url_for("dashboard") + "#admin-panel")
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -603,4 +610,4 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
