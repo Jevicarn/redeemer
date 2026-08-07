@@ -1,11 +1,11 @@
 {
-  "name": "Jevicarn School System",
-  "short_name": "Jevicarn",
+  "name": "School System",
+  "short_name": "School",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7fafc",
-  "theme_color": "#14335f",
+  "theme_color": "#f3f4f6",
   "description": "Offline-capable school finance and student management dashboard.",
   "icons": [
     {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "jevicarn-school-v1";
+const CACHE_NAME = "school-system-v1";
 const ASSETS = [
   "/",
   "/login",

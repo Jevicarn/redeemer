@@ -1,42 +1,18 @@
-const CACHE_NAME = "jevicarn-school-v1";
+
+const CACHE_NAME = 'school-system-cache-v1';
 const ASSETS = [
-  "/",
-  "/login",
-  "/dashboard",
-  "/profile",
-  "/static/css/style.css",
-  "/static/js/app.js",
-  "/static/manifest.json",
-  "/sw.js",
-  "/static/icons/icon-192.png",
-  "/static/icons/icon-512.png"
+  '/',
+  '/login',
+  '/static/css/style.css',
+  '/static/js/app.js',
+  '/static/manifest.json'
 ];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {}));
-  self.skipWaiting();
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((key) => key !== CACHE_NAME ? caches.delete(key) : Promise.resolve())))
-  );
-  self.clients.claim();
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key !== CACHE_NAME && caches.delete(key)))));
 });
-
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith((async () => {
-    try {
-      const networkResponse = await fetch(event.request);
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(event.request, networkResponse.clone());
-      return networkResponse;
-    } catch {
-      const cached = await caches.match(event.request);
-      if (cached) return cached;
-      const fallback = await caches.match("/");
-      return fallback || Response.error();
-    }
-  })());
+self.addEventListener('fetch', event => {
+  event.respondWith(caches.match(event.request).then(resp => resp || fetch(event.request)));
 });

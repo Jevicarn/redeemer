@@ -1,27 +1,28 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Jevicarn School System | Login</title>
+  <title>{{ portal_title }} | {{ 'Administrator Login' if mode == 'admin' else 'Portal Login' }}</title>
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-  <meta name="theme-color" content="#14335f">
+  <meta name="theme-color" content="{{ theme_color }}">
   <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="auth-body">
+<body class="auth-body {{ 'admin-auth' if mode == 'admin' else 'user-auth' }}">
   <main class="auth-shell">
     <section class="auth-card glass">
       <div class="brand-line">
         <span class="brand-dot"></span>
         <div>
-          <div class="brand-name">Jevicarn School System</div>
-          <div class="brand-subtitle">Offline-capable PWA • Flask</div>
+          <div class="brand-name">{{ portal_title }}</div>
+          <div class="brand-subtitle">{{ 'Administrator entry point' if mode == 'admin' else 'Staff and finance portal' }}</div>
         </div>
       </div>
 
-      <h1>Welcome back</h1>
-      <p class="muted">Sign in to the Admin or Finance workspace.</p>
+      <h1>{{ 'Admin sign in' if mode == 'admin' else 'Welcome back' }}</h1>
+      <p class="muted">{{ 'Enter the hidden administrator portal.' if mode == 'admin' else 'Sign in to continue to the school workspace.' }}</p>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -46,14 +47,30 @@
           <span>Password</span>
           <input name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
         </label>
-        <button class="btn btn-primary btn-block" type="submit">Sign In</button>
+        <button class="btn btn-primary btn-block" type="submit">{{ 'Enter admin portal' if mode == 'admin' else 'Sign in' }}</button>
       </form>
 
-      <div class="auth-footnote">
-        Demo credentials: <strong>admin / Admin@123</strong> or <strong>staff / Finance@123</strong>
+      {% if mode != 'admin' %}
+      <div class="auth-options">
+        <a class="auth-pill" href="{{ url_for('coming_soon', feature='google') }}">Continue with Google</a>
+        <a class="auth-pill" href="{{ url_for('coming_soon', feature='microsoft') }}">Continue with Microsoft</a>
+        <a class="auth-pill subtle" href="{{ url_for('coming_soon', feature='forgot-password') }}">Forgot password</a>
       </div>
+      <div class="auth-footnote">
+        Administrator entry is separate and hidden. Use the portal link if you need the admin console.
+      </div>
+      <div class="auth-footnote" style="margin-top:10px">
+        Hidden admin entry: <code>{{ admin_login_path }}</code>
+      </div>
+      {% else %}
+      <div class="auth-footnote">
+        This portal is reserved for administrators only.
+      </div>
+      <div class="auth-footnote" style="margin-top:10px">
+        Back to staff portal: <a href="{{ url_for('login') }}"><strong>Open staff login</strong></a>
+      </div>
+      {% endif %}
     </section>
   </main>
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
