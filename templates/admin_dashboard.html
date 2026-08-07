@@ -205,10 +205,10 @@
       <div class="panel-head"><div><div class="eyebrow">Employees</div><h3>User roster and roles</h3></div></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th><th>Action</th></tr></thead>
+          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
           <tbody>
             {% for u in users %}
-            <tr><td>{{ u.full_name }}</td><td>{{ u.username }}</td><td>{{ u.role }}</td><td>{{ u.created_at[:16] }}</td><td><form method="post" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Archive this user?');"><button class="btn btn-ghost mini" type="submit">Archive</button></form></td></tr>
+            <tr><td>{{ u.full_name }}</td><td>{{ u.username }}</td><td>{{ u.role }}</td><td>{{ u.created_at[:16] }}</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -261,7 +261,7 @@
       <div class="panel-head"><div><div class="eyebrow">Recent records</div><h3>Payments and pupils</h3></div></div>
       <div class="table-wrap" style="margin-bottom:18px">
         <table>
-          <thead><tr><th>Date</th><th>Admission No.</th><th>Pupil</th><th>Amount</th><th>Method</th><th>By</th><th>Status</th><th>Action</th></tr></thead>
+          <thead><tr><th>Date</th><th>Admission No.</th><th>Pupil</th><th>Amount</th><th>Method</th><th>By</th><th>Status</th></tr></thead>
           <tbody>
             {% for p in payments %}
             <tr><td>{{ p.created_at[:16] }}</td><td>{{ p.admission_no }}</td><td>{{ p.student_name }}</td><td>KES {{ "{:,.0f}".format(p.amount or 0) }}</td><td>{{ p.method }}</td><td>{{ p.recorded_by_name }}</td><td><span class="pill {{ p.status|lower }}">{{ p.status }}</span></td></tr>
@@ -274,7 +274,7 @@
           <thead><tr><th>Name</th><th>Admission No.</th><th>Grade</th><th>Status</th><th>Balance</th></tr></thead>
           <tbody>
             {% for s in students %}
-            <tr><td>{{ s.full_name }}</td><td>{{ s.admission_no }}</td><td>{{ s.grade }}</td><td>{{ s.payment_status }}</td><td>KES {{ "{:,.0f}".format(s.balance or 0) }}</td><td><form method="post" action="{{ url_for('delete_student', student_id=s.id) }}" onsubmit="return confirm('Archive this pupil?');"><button class="btn btn-ghost mini" type="submit">Archive</button></form></td></tr>
+            <tr><td>{{ s.full_name }}</td><td>{{ s.admission_no }}</td><td>{{ s.grade }}</td><td>{{ s.payment_status }}</td><td>KES {{ "{:,.0f}".format(s.balance or 0) }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

@@ -31,8 +31,6 @@ DB_PATH = INSTANCE_DIR / "school.db"
 UPLOAD_DIR = BASE_DIR / "uploads"
 ALLOWED_RESTORE_EXT = {"db", "sqlite", "sqlite3"}
 ADMIN_LOGIN_PATH = "/xtspolsjhulupjoppsup-lmkzcodup"
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin"
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "SecureAdmin!42")
 ADMIN_ROLES = {"Admin"}
 USER_ROLES = {"Staff"}
 ALL_ROLES = ("Admin", "Staff")
@@ -173,8 +171,6 @@ def init_db() -> None:
         ensure_column(conn, "students", "allergies TEXT")
         ensure_column(conn, "students", "special_info TEXT")
         ensure_column(conn, "students", "notes TEXT")
-        ensure_column(conn, "students", "deleted_at TEXT")
-        ensure_column(conn, "users", "deleted_at TEXT")
 
         if conn.execute("SELECT COUNT(*) AS c FROM school_settings").fetchone()["c"] == 0:
             conn.execute(
@@ -185,7 +181,7 @@ def init_db() -> None:
         if conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
             conn.execute(
                 "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
-                ("System Administrator", ADMIN_USERNAME, generate_password_hash(ADMIN_PASSWORD), "Admin"),
+                ("System Administrator", "admin", generate_password_hash("SecureAdmin!42"), "Admin"),
             )
             conn.execute(
                 "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
@@ -193,21 +189,15 @@ def init_db() -> None:
             )
         else:
             # Keep the seeded accounts usable even if an old database exists.
-            seed_rows = [
-                (ADMIN_USERNAME, "System Administrator", "Admin", ADMIN_PASSWORD),
+            for username, full_name, role, password in [
+                ("admin", "System Administrator", "Admin", "SecureAdmin!42"),
                 ("staff", "Finance Staff", "Staff", "SecureStaff!42"),
-            ]
-            for username, full_name, role, password in seed_rows:
+            ]:
                 row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
                 if row:
                     conn.execute(
-                        "UPDATE users SET full_name = ?, role = ?, password_hash = ?, deleted_at = NULL WHERE username = ?",
+                        "UPDATE users SET full_name = ?, role = ?, password_hash = ? WHERE username = ?",
                         (full_name, role, generate_password_hash(password), username),
-                    )
-                else:
-                    conn.execute(
-                        "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
-                        (full_name, username, generate_password_hash(password), role),
                     )
         if conn.execute("SELECT COUNT(*) AS c FROM students").fetchone()["c"] == 0:
             students = [
@@ -313,7 +303,7 @@ def load_current_user() -> None:
     user_id = session.get("user_id")
     g.user = None
     if user_id:
-        g.user = q("SELECT id, full_name, username, role FROM users WHERE id = ? AND deleted_at IS NULL", (user_id,), one=True)
+        g.user = q("SELECT id, full_name, username, role FROM users WHERE id = ?", (user_id,), one=True)
 
 
 def current_user() -> sqlite3.Row | None:
@@ -396,7 +386,7 @@ def inject_globals():
         "workspace_for": workspace_for,
         "school_settings": settings,
         "admin_login_path": ADMIN_LOGIN_PATH,
-        "theme_color": "#f3f4f6",
+        "theme_color": "#343541",
         "theme_accent": "#10a37f",
     }
 
@@ -422,7 +412,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        user = q("SELECT * FROM users WHERE username = ? AND deleted_at IS NULL", (username,), one=True)
+        user = q("SELECT * FROM users WHERE username = ?", (username,), one=True)
         if user and check_password_hash(user["password_hash"], password):
             if user["role"] == "Admin":
                 error = "Use the administrator entry point for admin access."
@@ -449,7 +439,7 @@ def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        user = q("SELECT * FROM users WHERE username = ? AND deleted_at IS NULL", (username,), one=True)
+        user = q("SELECT * FROM users WHERE username = ?", (username,), one=True)
         if user and user["role"] == "Admin" and check_password_hash(user["password_hash"], password):
             session.clear()
             session["user_id"] = user["id"]
@@ -494,8 +484,8 @@ def dashboard():
     settings = school_settings()
     selected_grade = request.args.get("grade", "").strip() or None
     grade_params = (selected_grade,) if selected_grade else ()
-    student_where = "WHERE deleted_at IS NULL AND grade = ?" if selected_grade else "WHERE deleted_at IS NULL"
-    payment_where = "WHERE s.deleted_at IS NULL AND s.grade = ?" if selected_grade else "WHERE s.deleted_at IS NULL"
+    student_where = "WHERE grade = ?" if selected_grade else ""
+    payment_where = "WHERE s.grade = ?" if selected_grade else ""
 
     students = q(f"SELECT * FROM students {student_where} ORDER BY created_at DESC, id DESC LIMIT 24", grade_params)
     payments = q(
@@ -511,14 +501,14 @@ def dashboard():
         grade_params,
     )
     audits = q("SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 12")
-    available_grades = [row["grade"] for row in q("SELECT DISTINCT grade FROM students WHERE deleted_at IS NULL ORDER BY grade")]
+    available_grades = [row["grade"] for row in q("SELECT DISTINCT grade FROM students ORDER BY grade")]
 
     summary_students = q(f"SELECT COUNT(*) AS c FROM students {student_where}", grade_params, one=True)["c"]
-    summary_active = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND grade = ? AND active = 1" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND active = 1", grade_params if selected_grade else (), one=True)["c"]
-    summary_paid = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND grade = ? AND payment_status = 'Paid'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND payment_status = 'Paid'", grade_params if selected_grade else (), one=True)["c"]
-    summary_pending = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND grade = ? AND payment_status = 'Pending'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND payment_status = 'Pending'", grade_params if selected_grade else (), one=True)["c"]
+    summary_active = q("SELECT COUNT(*) AS c FROM students WHERE grade = ? AND active = 1" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE active = 1", grade_params if selected_grade else (), one=True)["c"]
+    summary_paid = q("SELECT COUNT(*) AS c FROM students WHERE grade = ? AND payment_status = 'Paid'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Paid'", grade_params if selected_grade else (), one=True)["c"]
+    summary_pending = q("SELECT COUNT(*) AS c FROM students WHERE grade = ? AND payment_status = 'Pending'" if selected_grade else "SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Pending'", grade_params if selected_grade else (), one=True)["c"]
     summary_collections = q("SELECT COALESCE(SUM(amount), 0) AS total FROM payments p JOIN students s ON s.id = p.student_id WHERE p.status = 'Posted' AND s.grade = ?" if selected_grade else "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'Posted'", grade_params if selected_grade else (), one=True)["total"]
-    total_balance = q("SELECT COALESCE(SUM(balance), 0) AS total FROM students WHERE deleted_at IS NULL AND active = 1", one=True)["total"]
+    total_balance = q("SELECT COALESCE(SUM(balance), 0) AS total FROM students WHERE active = 1", one=True)["total"]
 
     summary = {
         "students": summary_students,
@@ -533,7 +523,7 @@ def dashboard():
     selected_student = None
     student_payments = []
     if selected_student_id:
-        selected_student = q("SELECT * FROM students WHERE id = ? AND deleted_at IS NULL", (selected_student_id,), one=True)
+        selected_student = q("SELECT * FROM students WHERE id = ?", (selected_student_id,), one=True)
         if selected_grade and selected_student and selected_student["grade"] != selected_grade:
             selected_student = None
         if selected_student:
@@ -581,7 +571,7 @@ def dashboard():
 @role_required("Admin")
 def admin_dashboard():
     settings = school_settings()
-    students = q("SELECT * FROM students WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 20")
+    students = q("SELECT * FROM students ORDER BY created_at DESC, id DESC LIMIT 20")
     payments = q(
         """
         SELECT p.*, s.full_name AS student_name, s.admission_no, u.full_name AS recorded_by_name
@@ -592,14 +582,14 @@ def admin_dashboard():
         LIMIT 20
         """
     )
-    users = q("SELECT id, full_name, username, role, created_at FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC")
+    users = q("SELECT id, full_name, username, role, created_at FROM users ORDER BY created_at DESC")
     audits = q("SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT 20")
-    total_students = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL", one=True)["c"]
-    active_students = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND active = 1", one=True)["c"]
-    paid_students = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND payment_status = 'Paid'", one=True)["c"]
-    pending_students = q("SELECT COUNT(*) AS c FROM students WHERE deleted_at IS NULL AND payment_status = 'Pending'", one=True)["c"]
+    total_students = q("SELECT COUNT(*) AS c FROM students", one=True)["c"]
+    active_students = q("SELECT COUNT(*) AS c FROM students WHERE active = 1", one=True)["c"]
+    paid_students = q("SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Paid'", one=True)["c"]
+    pending_students = q("SELECT COUNT(*) AS c FROM students WHERE payment_status = 'Pending'", one=True)["c"]
     total_income = q("SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'Posted'", one=True)["total"]
-    total_balance = q("SELECT COALESCE(SUM(balance), 0) AS total FROM students WHERE deleted_at IS NULL", one=True)["total"]
+    total_balance = q("SELECT COALESCE(SUM(balance), 0) AS total FROM students", one=True)["total"]
     avg_balance = q("SELECT COALESCE(AVG(balance), 0) AS total FROM students", one=True)["total"]
     categories = {
         "students": q("SELECT grade, COUNT(*) AS c FROM students GROUP BY grade ORDER BY grade"),
@@ -741,7 +731,7 @@ def add_student():
 @app.route("/students/<int:student_id>/update", methods=["POST"])
 @login_required
 def update_student(student_id: int):
-    student = q("SELECT * FROM students WHERE id = ? AND deleted_at IS NULL", (student_id,), one=True)
+    student = q("SELECT * FROM students WHERE id = ?", (student_id,), one=True)
     if not student:
         abort(404)
     fields = {
@@ -807,7 +797,7 @@ def add_payment():
     amount = request.form.get("amount", "").strip()
     method = request.form.get("method", "").strip()
     reference_no = request.form.get("reference_no", "").strip()
-    student = q("SELECT * FROM students WHERE admission_no = ? AND deleted_at IS NULL", (admission_no,), one=True)
+    student = q("SELECT * FROM students WHERE admission_no = ?", (admission_no,), one=True)
     if not student:
         flash("Student admission number not found.", "danger")
         return redirect(request.referrer or url_for("dashboard"))
@@ -876,39 +866,6 @@ def add_user():
     return redirect(request.referrer or url_for("admin_dashboard"))
 
 
-@app.route("/users/<int:user_id>/delete", methods=["POST"])
-@login_required
-@role_required("Admin")
-def delete_user(user_id: int):
-    user = q("SELECT id, full_name, username, role FROM users WHERE id = ? AND deleted_at IS NULL", (user_id,), one=True)
-    if not user:
-        abort(404)
-    if current_user()["id"] == user_id:
-        flash("You cannot delete the account you are currently using.", "warning")
-        return redirect(request.referrer or url_for("admin_dashboard"))
-    active_admins = q("SELECT COUNT(*) AS c FROM users WHERE deleted_at IS NULL AND role = 'Admin'", one=True)["c"]
-    if user["role"] == "Admin" and active_admins <= 1:
-        flash("At least one active admin must remain.", "warning")
-        return redirect(request.referrer or url_for("admin_dashboard"))
-    execute("UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
-    audit(current_user()["id"], current_user()["full_name"], "Delete User", f"{user['full_name']} ({user['username']}) archived.")
-    flash("User archived.", "success")
-    return redirect(request.referrer or url_for("admin_dashboard"))
-
-
-@app.route("/students/<int:student_id>/delete", methods=["POST"])
-@login_required
-@role_required("Admin")
-def delete_student(student_id: int):
-    student = q("SELECT id, full_name, admission_no FROM students WHERE id = ? AND deleted_at IS NULL", (student_id,), one=True)
-    if not student:
-        abort(404)
-    execute("UPDATE students SET deleted_at = CURRENT_TIMESTAMP, active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (student_id,))
-    audit(current_user()["id"], current_user()["full_name"], "Delete Student", f"{student['full_name']} ({student['admission_no']}) archived.")
-    flash("Student archived.", "success")
-    return redirect(request.referrer or url_for("admin_dashboard"))
-
-
 @app.route("/export/<kind>")
 @login_required
 @role_required("Admin")
@@ -921,12 +878,12 @@ def export_data(kind: str):
                 "alt_guardian_name", "alt_guardian_phone", "alt_guardian_email", "student_phone", "student_email",
                 "medical_condition", "allergies", "special_info", "notes", "payment_status", "balance", "active",
             ],
-            "SELECT admission_no, full_name, grade, guardian_name, guardian_phone, guardian_email, alt_guardian_name, alt_guardian_phone, alt_guardian_email, student_phone, student_email, medical_condition, allergies, special_info, notes, payment_status, balance, active FROM students WHERE deleted_at IS NULL ORDER BY id",
+            "SELECT admission_no, full_name, grade, guardian_name, guardian_phone, guardian_email, alt_guardian_name, alt_guardian_phone, alt_guardian_email, student_phone, student_email, medical_condition, allergies, special_info, notes, payment_status, balance, active FROM students ORDER BY id",
         ),
         "users": (
             "Employee Export",
             ["full_name", "username", "role", "created_at"],
-            "SELECT full_name, username, role, created_at FROM users WHERE deleted_at IS NULL ORDER BY id",
+            "SELECT full_name, username, role, created_at FROM users ORDER BY id",
         ),
         "payments": (
             "Payments Export",
@@ -1000,7 +957,7 @@ def backup_restore():
 @app.route("/api/student/<int:student_id>")
 @login_required
 def api_student(student_id: int):
-    student = q("SELECT * FROM students WHERE id = ? AND deleted_at IS NULL", (student_id,), one=True)
+    student = q("SELECT * FROM students WHERE id = ?", (student_id,), one=True)
     if not student:
         return jsonify({"error": "Not found"}), 404
     payments = q(

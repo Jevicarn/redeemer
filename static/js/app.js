@@ -29,15 +29,31 @@
   renderClock();
   setInterval(renderClock, 1000);
 
+  function isNarrowLayout() {
+    return window.matchMedia("(max-width: 820px)").matches;
+  }
+
+  function syncSidebarBackdrop() {
+    if (!sidebarBackdrop) return;
+    if (isNarrowLayout()) return;
+    sidebarBackdrop.classList.remove("show");
+    sidebarBackdrop.hidden = true;
+  }
+
   function openSidebar() {
-    if (!sidebarDrawer || !sidebarBackdrop) return;
+    if (!sidebarDrawer) return;
     if (sidebarHideTimer) {
       window.clearTimeout(sidebarHideTimer);
       sidebarHideTimer = null;
     }
     sidebarDrawer.classList.add("open");
-    sidebarBackdrop.hidden = false;
-    requestAnimationFrame(() => sidebarBackdrop.classList.add("show"));
+    if (sidebarBackdrop && isNarrowLayout()) {
+      sidebarBackdrop.hidden = false;
+      requestAnimationFrame(() => sidebarBackdrop.classList.add("show"));
+    } else if (sidebarBackdrop) {
+      sidebarBackdrop.classList.remove("show");
+      sidebarBackdrop.hidden = true;
+    }
   }
   function closeSidebar() {
     if (!sidebarDrawer || !sidebarBackdrop) return;
@@ -105,6 +121,8 @@
   sidebarToggle?.addEventListener("click", openSidebar);
   sidebarClose?.addEventListener("click", closeSidebar);
   sidebarBackdrop?.addEventListener("click", closeSidebar);
+  window.addEventListener("resize", syncSidebarBackdrop);
+  window.addEventListener("load", syncSidebarBackdrop);
 
   if (scrollRail && scrollThumb) {
     const onPointerMove = (event) => {

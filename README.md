@@ -19,12 +19,11 @@ python app.py
 Open `http://127.0.0.1:5000`
 
 ## Demo logins
-- Admin username: set with `ADMIN_USERNAME` (defaults to `admin`)
-- Admin password: set with `ADMIN_PASSWORD`
-- Staff account: `staff` / `SecureStaff!42`
+- Admin: `admin / Admin@123`
+- Staff: `staff / Finance@123`
 
 ## Deploy
-Set `SECRET_KEY` and `ADMIN_PASSWORD` in your environment, then run with gunicorn or your platform's production WSGI server.
+Set `SECRET_KEY` in your environment, then run with gunicorn or your platform's production WSGI server.
 
 ## Notes
 - This starter is designed to be resilient and offline-friendly, but no app can be guaranteed to have zero crashes in every environment.
