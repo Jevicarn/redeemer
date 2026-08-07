@@ -3,13 +3,11 @@
   const clock = document.getElementById("liveClock");
   const selectedStudentId = window.JEVICARN?.selectedStudentId ?? null;
   const sidebarDrawer = document.getElementById("sidebarDrawer");
-  const sidebarBackdrop = document.getElementById("sidebarBackdrop");
   const sidebarToggle = document.getElementById("sidebarToggle");
   const sidebarClose = document.getElementById("sidebarClose");
   const scrollRail = document.getElementById("scrollRail");
   const scrollThumb = document.getElementById("scrollThumb");
   let deferredPrompt = null;
-  let sidebarHideTimer = null;
   let scrollDrag = null;
 
   const panels = Array.from(document.querySelectorAll(".workspace-panel"));
@@ -29,40 +27,16 @@
   renderClock();
   setInterval(renderClock, 1000);
 
-  function isNarrowLayout() {
-    return window.matchMedia("(max-width: 820px)").matches;
-  }
-
-  function syncSidebarBackdrop() {
-    if (!sidebarBackdrop) return;
-    if (isNarrowLayout()) return;
-    sidebarBackdrop.classList.remove("show");
-    sidebarBackdrop.hidden = true;
-  }
-
   function openSidebar() {
-    if (!sidebarDrawer) return;
-    if (sidebarHideTimer) {
-      window.clearTimeout(sidebarHideTimer);
-      sidebarHideTimer = null;
-    }
-    sidebarDrawer.classList.add("open");
-    if (sidebarBackdrop && isNarrowLayout()) {
-      sidebarBackdrop.hidden = false;
-      requestAnimationFrame(() => sidebarBackdrop.classList.add("show"));
-    } else if (sidebarBackdrop) {
-      sidebarBackdrop.classList.remove("show");
-      sidebarBackdrop.hidden = true;
-    }
+    document.body.classList.remove("sidebar-collapsed");
   }
+
   function closeSidebar() {
-    if (!sidebarDrawer || !sidebarBackdrop) return;
-    sidebarDrawer.classList.remove("open");
-    sidebarBackdrop.classList.remove("show");
-    if (sidebarHideTimer) window.clearTimeout(sidebarHideTimer);
-    sidebarHideTimer = window.setTimeout(() => {
-      if (!sidebarDrawer.classList.contains("open")) sidebarBackdrop.hidden = true;
-    }, 180);
+    document.body.classList.add("sidebar-collapsed");
+  }
+
+  function toggleSidebar() {
+    document.body.classList.toggle("sidebar-collapsed");
   }
 
   function getScrollMetrics() {
@@ -118,11 +92,8 @@
     if (panelId) showPanel(panelId, scrollTarget);
   }
 
-  sidebarToggle?.addEventListener("click", openSidebar);
+  sidebarToggle?.addEventListener("click", toggleSidebar);
   sidebarClose?.addEventListener("click", closeSidebar);
-  sidebarBackdrop?.addEventListener("click", closeSidebar);
-  window.addEventListener("resize", syncSidebarBackdrop);
-  window.addEventListener("load", syncSidebarBackdrop);
 
   if (scrollRail && scrollThumb) {
     const onPointerMove = (event) => {
@@ -184,12 +155,6 @@
 
   document.querySelectorAll(".nav-action").forEach((button) => {
     button.addEventListener("click", () => activateFromButton(button));
-  });
-
-  document.querySelectorAll(".side-nav a").forEach((link) => {
-    link.addEventListener("click", () => {
-      if (window.matchMedia("(max-width: 1080px)").matches) closeSidebar();
-    });
   });
 
   window.addEventListener("beforeinstallprompt", (e) => {
