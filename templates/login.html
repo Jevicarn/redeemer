@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -43,11 +42,15 @@
           <span>Username</span>
           <input name="username" autocomplete="username" placeholder="admin" required>
         </label>
+
         <label>
           <span>Password</span>
           <input name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
         </label>
-        <button class="btn btn-primary btn-block" type="submit">{{ 'Enter admin portal' if mode == 'admin' else 'Sign in' }}</button>
+
+        <button class="btn btn-primary btn-block" type="submit">
+          {{ 'Enter admin portal' if mode == 'admin' else 'Sign in' }}
+        </button>
       </form>
 
       {% if mode != 'admin' %}
@@ -56,18 +59,19 @@
         <a class="auth-pill" href="{{ url_for('coming_soon', feature='microsoft') }}">Continue with Microsoft</a>
         <a class="auth-pill subtle" href="{{ url_for('coming_soon', feature='forgot-password') }}">Forgot password</a>
       </div>
+
       <div class="auth-footnote">
         Administrator entry is separate and hidden. Use the portal link if you need the admin console.
       </div>
-      <div class="auth-footnote" style="margin-top:10px">
-        Hidden admin entry: <code>{{ admin_login_path }}</code>
-      </div>
+
       {% else %}
       <div class="auth-footnote">
         This portal is reserved for administrators only.
       </div>
+
       <div class="auth-footnote" style="margin-top:10px">
-        Back to staff portal: <a href="{{ url_for('login') }}"><strong>Open staff login</strong></a>
+        Back to staff portal:
+        <a href="{{ url_for('login') }}"><strong>Open staff login</strong></a>
       </div>
       {% endif %}
     </section>
