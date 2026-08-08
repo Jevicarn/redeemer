@@ -54,6 +54,12 @@
         </div>
       </section>
       <section class="nav-group">
+        <button class="nav-group-toggle" type="button" aria-expanded="false" data-target="students-panel"><span>Pupils</span><span class="nav-caret">▾</span></button>
+        <div class="nav-group-links">
+          <button class="nav-link nav-action" type="button" data-target="students-panel">Manage pupils</button>
+        </div>
+      </section>
+      <section class="nav-group">
         <button class="nav-group-toggle" type="button" aria-expanded="false" data-target="exports-panel"><span>Exports</span><span class="nav-caret">▾</span></button>
         <div class="nav-group-links">
           <a class="nav-link" href="{{ url_for('export_data', kind='students') }}">Students CSV</a>
@@ -137,6 +143,36 @@
       </div>
     </section>
 
+    <section id="students-panel" class="panel glass workspace-panel hidden">
+      <div class="panel-head">
+        <div>
+          <div class="eyebrow">Pupil controls</div>
+          <h3>Delete pupils and review records</h3>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Admission No.</th><th>Grade</th><th>Status</th><th>Balance</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for s in students %}
+            <tr>
+              <td>{{ s.full_name }}</td>
+              <td>{{ s.admission_no }}</td>
+              <td>{{ s.grade }}</td>
+              <td><span class="pill {{ s.payment_status|lower }}">{{ s.payment_status }}</span></td>
+              <td>{{ school_settings.currency_code }} {{ "{:,.0f}".format(s.balance or 0) }}</td>
+              <td>
+                <form method="post" action="{{ url_for('delete_student', student_id=s.id) }}" onsubmit="return confirm('Delete this pupil? This will remove the pupil record and linked payments.');">
+                  <button class="btn btn-ghost mini" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="finance-panel" class="panel glass workspace-panel hidden">
       <div class="panel-head"><div><div class="eyebrow">Finance</div><h3>Income, deductions, and balances</h3></div></div>
       <div class="stats-grid" style="margin-bottom:16px">
@@ -205,10 +241,24 @@
       <div class="panel-head"><div><div class="eyebrow">Employees</div><h3>User roster and roles</h3></div></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th><th>Action</th></tr></thead>
           <tbody>
             {% for u in users %}
-            <tr><td>{{ u.full_name }}</td><td>{{ u.username }}</td><td>{{ u.role }}</td><td>{{ u.created_at[:16] }}</td></tr>
+            <tr>
+              <td>{{ u.full_name }}</td>
+              <td>{{ u.username }}</td>
+              <td>{{ u.role }}</td>
+              <td>{{ u.created_at[:16] }}</td>
+              <td>
+                {% if u.role == 'Staff' %}
+                <form method="post" action="{{ url_for('delete_user', user_id=u.id) }}" onsubmit="return confirm('Delete this staff member?');">
+                  <button class="btn btn-ghost mini" type="submit">Delete</button>
+                </form>
+                {% else %}
+                <span class="muted">Protected</span>
+                {% endif %}
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -245,7 +295,7 @@
     </section>
 
     <section id="settings-panel" class="panel glass workspace-panel hidden">
-      <div class="panel-head"><div><div class="eyebrow">School settings</div><h3>Branding and admission rules</h3></div></div>
+      <div class="panel-head"><div><div class="eyebrow">School settings</div><h3>Branding, admission rules, and fee setup</h3></div></div>
       <form class="stack-form two-col" method="post" action="{{ url_for('save_settings') }}">
         <label><span>School name</span><input name="school_name" value="{{ school_settings.school_name }}"></label>
         <label><span>Currency code</span><input name="currency_code" value="{{ school_settings.currency_code }}"></label>
@@ -253,6 +303,7 @@
         <label><span>Admission suffix</span><input name="admission_suffix" value="{{ school_settings.admission_suffix }}"></label>
         <label><span>Student name prefix</span><input name="student_name_prefix" value="{{ school_settings.student_name_prefix }}"></label>
         <label><span>Student name suffix</span><input name="student_name_suffix" value="{{ school_settings.student_name_suffix }}"></label>
+        <label style="grid-column:1/-1"><span>School fees</span><input name="school_fee" type="number" step="0.01" min="0" value="{{ school_settings.school_fee or 0 }}"></label>
         <div style="grid-column:1/-1"><button class="btn btn-primary" type="submit">Save settings</button></div>
       </form>
     </section>

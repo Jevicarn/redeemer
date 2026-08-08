@@ -33,12 +33,12 @@
 
     <nav class="side-nav side-nav-groups" aria-label="Workspace sections">
       <section class="nav-group open">
-        <button class="nav-group-toggle" type="button" aria-expanded="true" data-target="overview-panel">
-          <span>Overview</span><span class="nav-caret">▾</span>
+        <button class="nav-group-toggle" type="button" aria-expanded="true" data-target="home-panel">
+          <span>Home</span><span class="nav-caret">▾</span>
         </button>
         <div class="nav-group-links">
-          <button class="nav-link nav-action" type="button" data-target="overview-panel">Welcome</button>
-          <button class="nav-link nav-action" type="button" data-target="overview-panel" data-scroll="stats-grid">Statistics</button>
+          <button class="nav-link nav-action" type="button" data-target="home-panel">Home</button>
+          <button class="nav-link nav-action" type="button" data-target="home-panel" data-scroll="home-stats-grid">Summary</button>
         </div>
       </section>
       <section class="nav-group open">
@@ -116,22 +116,41 @@
       {% endif %}
     {% endwith %}
 
-    <section id="overview-panel" class="panel glass workspace-panel landing-panel">
-      <div class="eyebrow">Welcome to the school portal</div>
-      <h1 class="hero-title">Hello, {{ current_user.full_name if current_user else 'User' }}</h1>
-      <p class="hero-copy">Manage pupils, record payments, and keep accountability in one clean workspace.</p>
+    <section id="home-panel" class="panel glass workspace-panel landing-panel">
+      <div class="eyebrow">Home</div>
+      <h1 class="hero-title">Available pupils</h1>
+      <p class="hero-copy">Quick access to active pupils, fee status, and the live pupil record view.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Admission number</th><th>Status (fee status)</th><th>View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in available_students %}
+            <tr class="student-row" data-student-id="{{ s.id }}">
+              <td>{{ s.full_name }}</td>
+              <td>{{ s.admission_no }}</td>
+              <td><span class="pill {{ s.payment_status|lower }}">{{ s.payment_status }}</span></td>
+              <td><button class="btn btn-ghost mini js-view-student" type="button" data-student-id="{{ s.id }}">View</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
       <div class="quick-actions">
         <button class="btn btn-primary" type="button" data-target="add-pupil-panel">Add pupil</button>
         <button class="btn btn-ghost" type="button" data-target="payments-panel">Receive payment</button>
         <a class="btn btn-ghost" href="{{ url_for('export_data', kind='students') }}">Download students CSV</a>
       </div>
-      <div class="stats-grid" id="stats-grid">
+      <div class="stats-grid" id="home-stats-grid">
         <div class="mini-card"><span>Total pupils</span><strong>{{ summary.students }}</strong></div>
         <div class="mini-card"><span>Active pupils</span><strong>{{ summary.active_students }}</strong></div>
         <div class="mini-card"><span>Paid</span><strong>{{ summary.paid }}</strong></div>
         <div class="mini-card"><span>Pending</span><strong>{{ summary.pending }}</strong></div>
-        <div class="mini-card"><span>Total collections</span><strong>KES {{ "{:,.0f}".format(summary.collections or 0) }}</strong></div>
-        <div class="mini-card"><span>Total balance</span><strong>KES {{ "{:,.0f}".format(summary.balance or 0) }}</strong></div>
+        <div class="mini-card"><span>Total collections</span><strong>{{ school_settings.currency_code }} {{ "{:,.0f}".format(summary.collections or 0) }}</strong></div>
+        <div class="mini-card"><span>Total balance</span><strong>{{ school_settings.currency_code }} {{ "{:,.0f}".format(summary.balance or 0) }}</strong></div>
       </div>
     </section>
 
@@ -293,6 +312,34 @@
         <div class="mini-card"><span>Grade</span><strong id="modalGrade"></strong></div>
         <div class="mini-card"><span>Status</span><strong id="modalStatus"></strong></div>
         <div class="mini-card"><span>Balance</span><strong id="modalBalance"></strong></div>
+      </div>
+      <div class="detail-card">
+        <h4>Quick edit</h4>
+        <form class="stack-form two-col" id="studentEditForm" method="post">
+          <label><span>Admission number</span><input name="admission_no" id="editAdmissionNo" required></label>
+          <label><span>Pupil name</span><input name="full_name" id="editFullName" required></label>
+          <label><span>Grade</span><input name="grade" id="editGrade" required></label>
+          <label><span>Fee status</span>
+            <select name="payment_status" id="editPaymentStatus">
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+            </select>
+          </label>
+          <label><span>Exact fee balance</span><input name="balance" id="editBalance" type="number" step="0.01" min="0"></label>
+          <label><span>Active</span>
+            <select name="active" id="editActive">
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
+            </select>
+          </label>
+          <label><span>Primary guardian</span><input name="guardian_name" id="editGuardianName"></label>
+          <label><span>Guardian phone</span><input name="guardian_phone" id="editGuardianPhone"></label>
+          <label><span>Guardian email</span><input name="guardian_email" id="editGuardianEmail" type="email"></label>
+          <label><span>Medical condition</span><input name="medical_condition" id="editMedical"></label>
+          <label><span>Allergies</span><input name="allergies" id="editAllergies"></label>
+          <label style="grid-column:1/-1"><span>Special info</span><input name="special_info" id="editSpecialInfo"></label>
+          <div style="grid-column:1/-1"><button class="btn btn-primary" type="submit">Save changes</button></div>
+        </form>
       </div>
       <div class="detail-card">
         <h4>Parent and contact details</h4>

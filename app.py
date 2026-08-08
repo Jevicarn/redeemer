@@ -99,7 +99,8 @@ def init_db() -> None:
                 admission_suffix TEXT NOT NULL DEFAULT '',
                 student_name_prefix TEXT NOT NULL DEFAULT '',
                 student_name_suffix TEXT NOT NULL DEFAULT '',
-                currency_code TEXT NOT NULL DEFAULT 'KES'
+                currency_code TEXT NOT NULL DEFAULT 'KES',
+                school_fee REAL NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS students (
@@ -158,6 +159,7 @@ def init_db() -> None:
         ensure_column(conn, "school_settings", "student_name_prefix TEXT NOT NULL DEFAULT ''")
         ensure_column(conn, "school_settings", "student_name_suffix TEXT NOT NULL DEFAULT ''")
         ensure_column(conn, "school_settings", "currency_code TEXT NOT NULL DEFAULT 'KES'")
+        ensure_column(conn, "school_settings", "school_fee REAL NOT NULL DEFAULT 0")
 
         ensure_column(conn, "students", "guardian_name TEXT")
         ensure_column(conn, "students", "guardian_phone TEXT")
@@ -174,8 +176,8 @@ def init_db() -> None:
 
         if conn.execute("SELECT COUNT(*) AS c FROM school_settings").fetchone()["c"] == 0:
             conn.execute(
-                "INSERT INTO school_settings(id, school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code) VALUES (1, ?, ?, ?, ?, ?, ?)",
-                ("School", "ADM-", "", "", "", "KES"),
+                "INSERT INTO school_settings(id, school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code, school_fee) VALUES (1, ?, ?, ?, ?, ?, ?, ?)",
+                ("School", "ADM-", "", "", "", "KES", 0),
             )
 
         if conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
@@ -347,7 +349,7 @@ def school_settings() -> sqlite3.Row:
     row = q("SELECT * FROM school_settings WHERE id = 1", one=True)
     if row is None:
         execute(
-            "INSERT OR IGNORE INTO school_settings(id, school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code) VALUES (1, 'School', 'ADM-', '', '', '', 'KES')"
+            "INSERT OR IGNORE INTO school_settings(id, school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code, school_fee) VALUES (1, 'School', 'ADM-', '', '', '', 'KES', 0)"
         )
         row = q("SELECT * FROM school_settings WHERE id = 1", one=True)
     return row
@@ -488,6 +490,7 @@ def dashboard():
     payment_where = "WHERE s.grade = ?" if selected_grade else ""
 
     students = q(f"SELECT * FROM students {student_where} ORDER BY created_at DESC, id DESC LIMIT 24", grade_params)
+    available_students = q("SELECT * FROM students WHERE active = 1 ORDER BY created_at DESC, id DESC LIMIT 24")
     payments = q(
         f"""
         SELECT p.*, s.full_name AS student_name, s.admission_no, u.full_name AS recorded_by_name
@@ -562,6 +565,7 @@ def dashboard():
         selected_student_payments=student_payments,
         selected_grade=selected_grade,
         available_grades=available_grades,
+        available_students=available_students,
         settings=settings,
     )
 
@@ -649,13 +653,17 @@ def save_settings():
     student_name_prefix = request.form.get("student_name_prefix", "").strip()
     student_name_suffix = request.form.get("student_name_suffix", "").strip()
     currency_code = request.form.get("currency_code", "").strip() or "KES"
+    try:
+        school_fee = float(request.form.get("school_fee", "0") or 0)
+    except ValueError:
+        school_fee = 0.0
     execute(
         """
         UPDATE school_settings
-        SET school_name = ?, admission_prefix = ?, admission_suffix = ?, student_name_prefix = ?, student_name_suffix = ?, currency_code = ?
+        SET school_name = ?, admission_prefix = ?, admission_suffix = ?, student_name_prefix = ?, student_name_suffix = ?, currency_code = ?, school_fee = ?
         WHERE id = 1
         """,
-        (school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code),
+        (school_name, admission_prefix, admission_suffix, student_name_prefix, student_name_suffix, currency_code, school_fee),
     )
     audit(current_user()["id"], current_user()["full_name"], "Update Settings", f"School settings updated for {school_name}.")
     flash("School settings updated.", "success")
@@ -693,6 +701,7 @@ def add_student():
         full_name = f"{full_name} {settings['student_name_suffix']}".strip()
 
     try:
+        starting_balance = float(settings["school_fee"] or 0)
         execute(
             """
             INSERT INTO students(
@@ -701,7 +710,7 @@ def add_student():
                 alt_guardian_name, alt_guardian_phone, alt_guardian_email,
                 student_phone, student_email, medical_condition, allergies, special_info, notes,
                 payment_status, balance, active
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 0, 1)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, 1)
             """,
             (
                 admission_no,
@@ -719,6 +728,7 @@ def add_student():
                 allergies,
                 special_info,
                 notes,
+                starting_balance,
             ),
         )
         audit(current_user()["id"], current_user()["full_name"], "Add Student", f"{full_name} ({admission_no}) created.")
@@ -788,6 +798,38 @@ def update_student(student_id: int):
     audit(current_user()["id"], current_user()["full_name"], "Edit Student", f"Student {student['admission_no']} updated.")
     flash("Student updated.", "success")
     return redirect(request.referrer or url_for("dashboard", student_id=student_id))
+
+
+@app.route("/students/<int:student_id>/delete", methods=["POST"])
+@login_required
+@role_required("Admin")
+def delete_student(student_id: int):
+    student = q("SELECT * FROM students WHERE id = ?", (student_id,), one=True)
+    if not student:
+        abort(404)
+    execute("DELETE FROM students WHERE id = ?", (student_id,))
+    audit(current_user()["id"], current_user()["full_name"], "Delete Student", f"Student {student['admission_no']} deleted.")
+    flash("Pupil deleted.", "success")
+    return redirect(request.referrer or url_for("admin_dashboard"))
+
+
+@app.route("/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@role_required("Admin")
+def delete_user(user_id: int):
+    user = q("SELECT * FROM users WHERE id = ?", (user_id,), one=True)
+    if not user:
+        abort(404)
+    if user["id"] == current_user()["id"]:
+        flash("You cannot delete your own account.", "warning")
+        return redirect(request.referrer or url_for("admin_dashboard"))
+    if user["role"] != "Staff":
+        flash("Only staff members can be deleted from here.", "warning")
+        return redirect(request.referrer or url_for("admin_dashboard"))
+    execute("DELETE FROM users WHERE id = ?", (user_id,))
+    audit(current_user()["id"], current_user()["full_name"], "Delete User", f"Staff member {user['username']} deleted.")
+    flash("Staff member deleted.", "success")
+    return redirect(request.referrer or url_for("admin_dashboard"))
 
 
 @app.route("/payments/add", methods=["POST"])

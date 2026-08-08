@@ -184,6 +184,19 @@
     allergies: document.getElementById("modalAllergies"),
     specialInfo: document.getElementById("modalSpecialInfo"),
     paymentsBody: document.getElementById("modalPaymentsBody"),
+    editForm: document.getElementById("studentEditForm"),
+    editAdmissionNo: document.getElementById("editAdmissionNo"),
+    editFullName: document.getElementById("editFullName"),
+    editGrade: document.getElementById("editGrade"),
+    editPaymentStatus: document.getElementById("editPaymentStatus"),
+    editBalance: document.getElementById("editBalance"),
+    editActive: document.getElementById("editActive"),
+    editGuardianName: document.getElementById("editGuardianName"),
+    editGuardianPhone: document.getElementById("editGuardianPhone"),
+    editGuardianEmail: document.getElementById("editGuardianEmail"),
+    editMedical: document.getElementById("editMedical"),
+    editAllergies: document.getElementById("editAllergies"),
+    editSpecialInfo: document.getElementById("editSpecialInfo"),
   };
 
   function renderPaymentRows(payments = []) {
@@ -219,6 +232,19 @@
       modalEls.medical.textContent = s.medical_condition || "—";
       modalEls.allergies.textContent = s.allergies || "—";
       modalEls.specialInfo.textContent = s.special_info || "—";
+      if (modalEls.editForm) modalEls.editForm.action = `/students/${studentId}/update`;
+      if (modalEls.editAdmissionNo) modalEls.editAdmissionNo.value = s.admission_no || "";
+      if (modalEls.editFullName) modalEls.editFullName.value = s.full_name || "";
+      if (modalEls.editGrade) modalEls.editGrade.value = s.grade || "";
+      if (modalEls.editPaymentStatus) modalEls.editPaymentStatus.value = s.payment_status || "Pending";
+      if (modalEls.editBalance) modalEls.editBalance.value = Number(s.balance || 0);
+      if (modalEls.editActive) modalEls.editActive.value = String(Number(s.active ?? 1));
+      if (modalEls.editGuardianName) modalEls.editGuardianName.value = s.guardian_name || "";
+      if (modalEls.editGuardianPhone) modalEls.editGuardianPhone.value = s.guardian_phone || "";
+      if (modalEls.editGuardianEmail) modalEls.editGuardianEmail.value = s.guardian_email || "";
+      if (modalEls.editMedical) modalEls.editMedical.value = s.medical_condition || "";
+      if (modalEls.editAllergies) modalEls.editAllergies.value = s.allergies || "";
+      if (modalEls.editSpecialInfo) modalEls.editSpecialInfo.value = s.special_info || "";
       renderPaymentRows(data.payments || []);
       modal?.showModal();
     } catch (err) {
@@ -251,7 +277,7 @@
   });
 
   if (panels.length) {
-    const defaultPanel = document.querySelector(".workspace-panel:not(.hidden)");
+    const defaultPanel = document.querySelector(".workspace-panel:not(.hidden)") || document.getElementById("home-panel") || panels[0];
     if (defaultPanel) panels.forEach((p) => p !== defaultPanel && p.classList.add("hidden"));
   }
   syncScrollRail();
