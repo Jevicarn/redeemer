@@ -506,13 +506,10 @@ def login():
         password = request.form.get("password", "")
         user = q("SELECT * FROM users WHERE username = ?", (username,), one=True)
         if user and check_password_hash(user["password_hash"], password):
-            if user["role"] == "Admin":
-                error = "Use the administrator entry point for admin access."
-            else:
-                session.clear()
-                session["user_id"] = user["id"]
-                audit(user["id"], user["full_name"], "Login", f"{user['username']} logged in.")
-                return redirect(url_for("dashboard"))
+            session.clear()
+            session["user_id"] = user["id"]
+            audit(user["id"], user["full_name"], "Login", f"{user['username']} logged in.")
+            return redirect(url_for("admin_dashboard" if user["role"] == "Admin" else "dashboard"))
         else:
             error = "Invalid username or password."
 
