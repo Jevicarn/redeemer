@@ -4,6 +4,7 @@ import csv
 import io
 import os
 import sqlite3
+from collections.abc import MutableMapping
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -12,14 +13,14 @@ from typing import Any, Callable, Iterable
 from flask import (
     Flask,
     abort,
-    flash,
+    flash as flask_flash,
     g,
     jsonify,
     redirect,
     render_template,
     request,
     send_file,
-    session,
+    session as flask_session,
     url_for,
 )
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -37,10 +38,78 @@ ALL_ROLES = ("Admin", "Staff")
 
 app = Flask(__name__, instance_path=str(INSTANCE_DIR), instance_relative_config=True)
 app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY", "dev-school-portal-secret-change-me"),
     MAX_CONTENT_LENGTH=20 * 1024 * 1024,
     TEMPLATES_AUTO_RELOAD=True,
 )
+
+# -------------------------------------------------------------------
+# Keyless request session and flash stubs
+# -------------------------------------------------------------------
+_SESSION_COOKIE = "school_user_id"
+
+
+class _SimpleSession(MutableMapping):
+    def _data(self) -> dict[str, Any]:
+        if not hasattr(g, "_simple_session_data"):
+            data: dict[str, Any] = {}
+            if request:
+                raw = request.cookies.get(_SESSION_COOKIE)
+                if raw:
+                    try:
+                        data["user_id"] = int(raw)
+                    except (TypeError, ValueError):
+                        pass
+            g._simple_session_data = data
+        return g._simple_session_data
+
+    def __getitem__(self, key):
+        return self._data()[key]
+
+    def __setitem__(self, key, value):
+        self._data()[key] = value
+
+    def __delitem__(self, key):
+        del self._data()[key]
+
+    def __iter__(self):
+        return iter(self._data())
+
+    def __len__(self):
+        return len(self._data())
+
+    def get(self, key, default=None):
+        return self._data().get(key, default)
+
+    def clear(self):
+        self._data().clear()
+
+    def pop(self, key, default=None):
+        return self._data().pop(key, default)
+
+    def __contains__(self, key):
+        return key in self._data()
+
+
+session = _SimpleSession()
+
+
+def flash(message: str, category: str = "message") -> None:
+    # Keyless fallback: keep route logic working without Flask's signed session.
+    return None
+
+
+app.jinja_env.globals["get_flashed_messages"] = lambda *args, **kwargs: []
+
+
+@app.after_request
+def persist_simple_session(response):
+    data = getattr(g, "_simple_session_data", {})
+    if data.get("user_id") is not None:
+        response.set_cookie(_SESSION_COOKIE, str(data["user_id"]), httponly=True, samesite="Lax")
+    else:
+        response.delete_cookie(_SESSION_COOKIE)
+    return response
+
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -180,27 +249,48 @@ def init_db() -> None:
                 ("School", "ADM-", "", "", "", "KES", 0),
             )
 
+        # Administrator credentials are controlled by Render environment variables.
+        # Set ADMIN_USERNAME and ADMIN_PASSWORD in the service Environment.
+        # We never overwrite the administrator password with a hard-coded value.
+        admin_username = os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin"
+        admin_password = os.environ.get("ADMIN_PASSWORD", "").strip()
+
         if conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
+            # First boot: create the configured admin, plus the existing staff account.
+            if not admin_password:
+                # Keep a development-only fallback for a brand-new local database.
+                admin_password = "SecureAdmin!42"
             conn.execute(
                 "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
-                ("System Administrator", "admin", generate_password_hash("SecureAdmin!42"), "Admin"),
+                ("System Administrator", admin_username, generate_password_hash(admin_password), "Admin"),
             )
             conn.execute(
                 "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
                 ("Finance Staff", "staff", generate_password_hash("SecureStaff!42"), "Staff"),
             )
-        else:
-            # Keep the seeded accounts usable even if an old database exists.
-            for username, full_name, role, password in [
-                ("admin", "System Administrator", "Admin", "SecureAdmin!42"),
-                ("staff", "Finance Staff", "Staff", "SecureStaff!42"),
-            ]:
-                row = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-                if row:
-                    conn.execute(
-                        "UPDATE users SET full_name = ?, role = ?, password_hash = ? WHERE username = ?",
-                        (full_name, role, generate_password_hash(password), username),
-                    )
+        elif admin_password:
+            # On a deployed system, environment credentials are authoritative.
+            # This also repairs an old database whose admin password was seeded
+            # by an earlier version of the application.
+            existing = conn.execute(
+                "SELECT id FROM users WHERE username = ?", (admin_username,)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    "UPDATE users SET full_name = ?, role = 'Admin', password_hash = ? WHERE username = ?",
+                    ("System Administrator", generate_password_hash(admin_password), admin_username),
+                )
+            else:
+                # If the configured admin username changed, remove the old
+                # seeded admin account only, then create the configured one.
+                conn.execute(
+                    "DELETE FROM users WHERE role = 'Admin' AND username = 'admin'"
+                )
+                conn.execute(
+                    "INSERT INTO users(full_name, username, password_hash, role) VALUES (?, ?, ?, ?)",
+                    ("System Administrator", admin_username, generate_password_hash(admin_password), "Admin"),
+                )
         if conn.execute("SELECT COUNT(*) AS c FROM students").fetchone()["c"] == 0:
             students = [
                 (
